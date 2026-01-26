@@ -13,7 +13,7 @@ execute:
   warning: false
   message: false
 params:
-  season: 2024
+  season: 2025
   min_attempts: 50
   conferences: ["Big Ten", "SEC", "Big 12", "ACC"]
 ---

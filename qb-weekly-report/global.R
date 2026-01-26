@@ -22,7 +22,7 @@ FBS_CONFERENCES <- c(
 )
 
 # Current season (update as needed)
-CURRENT_SEASON <- 2024
+CURRENT_SEASON <- 2025
 
 # Function to fetch and process QB stats
 fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {

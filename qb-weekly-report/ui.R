@@ -18,8 +18,8 @@ ui <- page_sidebar(
     selectInput(
       inputId = "season",
       label = "Season",
-      choices = c(2024, 2023, 2022, 2021, 2020),
-      selected = 2024
+      choices = c(2025, 2024, 2023, 2022, 2021),
+      selected = 2025
     ),
 
     # Week selector
