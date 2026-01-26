@@ -5,8 +5,11 @@ ui <- page_sidebar(
   theme = bs_theme(
     version = 5,
     bootswatch = "flatly",
-    primary = "#2c3e50",
-    "navbar-bg" = "#2c3e50"
+    primary = "#001E44",
+    secondary = "#6c757d",
+    success = "#5a6d7a",
+    info = "#8a9aa5",
+    "navbar-bg" = "#001E44"
   ),
 
   # Sidebar with filters
@@ -99,7 +102,7 @@ ui <- page_sidebar(
       ),
       div(
         downloadButton("download_csv", "Download CSV", class = "btn-sm btn-outline-primary me-2"),
-        downloadButton("download_xlsx", "Download Excel", class = "btn-sm btn-outline-success")
+        downloadButton("download_xlsx", "Download Excel", class = "btn-sm btn-outline-secondary")
       )
     ),
     card_body(
@@ -110,25 +113,25 @@ ui <- page_sidebar(
           title = "Total QBs",
           value = textOutput("total_qbs"),
           showcase = icon("users"),
-          theme = "primary"
+          theme = value_box_theme(bg = "#001E44", fg = "#ffffff")
         ),
         value_box(
           title = "Avg EPA/Play",
           value = textOutput("avg_epa"),
           showcase = icon("chart-line"),
-          theme = "success"
+          theme = value_box_theme(bg = "#374151", fg = "#ffffff")
         ),
         value_box(
           title = "Total TDs",
           value = textOutput("total_tds"),
           showcase = icon("football"),
-          theme = "info"
+          theme = value_box_theme(bg = "#6b7280", fg = "#ffffff")
         ),
         value_box(
           title = "Conferences",
           value = textOutput("num_conferences"),
           showcase = icon("building-columns"),
-          theme = "secondary"
+          theme = value_box_theme(bg = "#9ca3af", fg = "#1f2937")
         )
       ),
 
@@ -137,7 +140,7 @@ ui <- page_sidebar(
       shinycssloaders::withSpinner(
         reactableOutput("qb_table"),
         type = 6,
-        color = "#2c3e50"
+        color = "#001E44"
       )
     )
   )

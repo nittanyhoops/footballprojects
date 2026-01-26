@@ -106,9 +106,14 @@ create_qb_table <- function(data) {
     pageSizeOptions = c(10, 25, 50, 100),
     defaultSorted = list(epa_per_play = "desc"),
     theme = reactableTheme(
-      borderColor = "#dfe2e5",
-      stripedColor = "#f6f8fa",
-      highlightColor = "#f0f5ff",
+      borderColor = "#d1d5db",
+      stripedColor = "#f3f4f6",
+      highlightColor = "#e5e7eb",
+      headerStyle = list(
+        backgroundColor = "#001E44",
+        color = "#ffffff",
+        fontWeight = "bold"
+      ),
       cellPadding = "8px 12px",
       style = list(fontFamily = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")
     ),
@@ -163,13 +168,13 @@ create_qb_table <- function(data) {
         name = "TD",
         minWidth = 50,
         align = "center",
-        style = list(color = "#28a745", fontWeight = "bold")
+        style = list(color = "#001E44", fontWeight = "bold")
       ),
       interceptions = colDef(
         name = "INT",
         minWidth = 50,
         align = "center",
-        style = list(color = "#dc3545")
+        style = list(color = "#6b7280")
       ),
       total_epa = colDef(
         name = "Total EPA",
@@ -177,7 +182,7 @@ create_qb_table <- function(data) {
         align = "center",
         format = colFormat(digits = 1),
         style = function(value) {
-          color <- if (value > 0) "#28a745" else if (value < 0) "#dc3545" else "#6c757d"
+          color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
           list(color = color, fontWeight = "bold")
         }
       ),
@@ -186,7 +191,7 @@ create_qb_table <- function(data) {
         minWidth = 90,
         align = "center",
         style = function(value) {
-          color <- if (value > 0) "#28a745" else if (value < 0) "#dc3545" else "#6c757d"
+          color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
           list(color = color, fontWeight = "bold")
         }
       )
