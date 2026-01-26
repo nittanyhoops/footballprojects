@@ -1,0 +1,35 @@
+# R specific
+.Rhistory
+.Rdata
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+
+# Shiny
+rsconnect/
+
+# Quarto
+/.quarto/
+_site/
+*_files/
+*.html
+
+# Data cache
+*.rds
+*.parquet
+data/cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.Renviron
