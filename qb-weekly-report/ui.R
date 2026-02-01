@@ -86,9 +86,8 @@ ui <- page_sidebar(
     # Info text
     div(
       class = "text-muted small",
-      p("Data sourced from cfbfastR"),
       p("EPA = Expected Points Added"),
-      p("Sorted by EPA/Play by default")
+      p("Sorted by EPA/Game by default")
     )
   ),
 
@@ -141,6 +140,17 @@ ui <- page_sidebar(
         reactableOutput("qb_table"),
         type = 6,
         color = "#001E44"
+      ),
+
+      # Footer
+      hr(),
+      div(
+        class = "text-center text-muted small mt-3",
+        p(
+          "Data sourced from ",
+          tags$a(href = "https://cfbfastR.sportsdataverse.org/", target = "_blank", "cfbfastR")
+        ),
+        p("Dashboard by @NittanyHoops")
       )
     )
   )

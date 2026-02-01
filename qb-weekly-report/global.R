@@ -85,10 +85,11 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
       yards_per_att = round(passing_yards / attempts, 1),
-      epa_per_play = round(total_epa / attempts, 3)
+      epa_per_play = round(total_epa / attempts, 3),
+      epa_per_game = round(total_epa / games, 1)
     ) |>
     filter(attempts >= min_attempts) |>
-    arrange(desc(epa_per_play))
+    arrange(desc(epa_per_game))
 }
 
 # Create styled reactable for QB stats
@@ -104,7 +105,7 @@ create_qb_table <- function(data) {
     defaultPageSize = 25,
     showPageSizeOptions = TRUE,
     pageSizeOptions = c(10, 25, 50, 100),
-    defaultSorted = list(epa_per_play = "desc"),
+    defaultSorted = list(epa_per_game = "desc"),
     theme = reactableTheme(
       borderColor = "#d1d5db",
       stripedColor = "#f3f4f6",
@@ -189,6 +190,15 @@ create_qb_table <- function(data) {
       epa_per_play = colDef(
         name = "EPA/Play",
         minWidth = 90,
+        align = "center",
+        style = function(value) {
+          color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
+          list(color = color, fontWeight = "bold")
+        }
+      ),
+      epa_per_game = colDef(
+        name = "EPA/Game",
+        minWidth = 95,
         align = "center",
         style = function(value) {
           color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
