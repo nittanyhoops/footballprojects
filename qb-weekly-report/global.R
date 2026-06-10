@@ -25,36 +25,61 @@ FBS_CONFERENCES <- c(
 # Current season (update as needed)
 CURRENT_SEASON <- 2025
 
-# Team logos from ESPN (no API key required); falls back to empty if unavailable
-TEAM_LOGOS <- tryCatch({
-  cfbfastR::cfbd_team_info() |>
-    dplyr::select(team = school, logo = logo_primary) |>
-    dplyr::distinct(team, .keep_all = TRUE)
-}, error = function(e) {
-  data.frame(team = character(), logo = character(), stringsAsFactors = FALSE)
-})
-
-# Function to normalize player names (handles "Shotgun #10 J.Sayin" -> last name)
-normalize_player_name <- function(name) {
-  # Remove formation/position prefixes like "Shotgun", "Pistol", "Under Center", etc.
-  cleaned <- gsub("^(Shotgun|Pistol|Under Center|Wildcat|I-Form|Singleback|Jumbo|Goal Line|Empty)\\s*", "", name, ignore.case = TRUE)
-  # Remove jersey numbers like "#10" or "# 10"
-
-  cleaned <- gsub("#\\s*\\d+\\s*", "", cleaned)
-  # Trim whitespace
-  cleaned <- trimws(cleaned)
-  # Extract last name (last word, or after abbreviated first initial like "J.")
-  # If name is like "J.Sayin" or "J. Sayin", extract "Sayin"
-  if (grepl("^[A-Z]\\.", cleaned)) {
-    cleaned <- gsub("^[A-Z]\\.\\s*", "", cleaned)
-  }
-  return(cleaned)
+# Normalize team names for joining across data sources
+# (lowercase, strip accents and punctuation: "San José State" -> "sanjosestate")
+normalize_team_name <- function(x) {
+  x <- iconv(x, from = "UTF-8", to = "ASCII//TRANSLIT")
+  gsub("[^a-z0-9]", "", tolower(x))
 }
 
-# Function to get canonical player name from a group of similar names
+# Team logos from ESPN's public teams API (no API key required).
+# Logo URLs follow the ESPN CDN pattern keyed by team id.
+TEAM_LOGOS <- tryCatch({
+  raw <- jsonlite::fromJSON(
+    "https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams?limit=1000"
+  )
+  teams_df <- raw$sports$leagues[[1]]$teams[[1]]$team
+  data.frame(
+    team_key = normalize_team_name(teams_df$location),
+    logo = paste0("https://a.espncdn.com/i/teamlogos/ncaa/500/", teams_df$id, ".png"),
+    stringsAsFactors = FALSE
+  ) |>
+    dplyr::distinct(team_key, .keep_all = TRUE)
+}, error = function(e) {
+  message("Could not load team logos: ", e$message)
+  data.frame(team_key = character(), logo = character(), stringsAsFactors = FALSE)
+})
+
+# Strip play-formation prefixes and jersey numbers from a player name
+# ("Shotgun #10 J.Sayin" -> "J.Sayin")
+clean_display_name <- function(name) {
+  cleaned <- gsub(
+    "^(Shotgun|Pistol|Under Center|Wildcat|I-Form|Singleback|Jumbo|Goal Line|Empty|No Huddle( Shotgun)?)\\s*",
+    "", name, ignore.case = TRUE
+  )
+  cleaned <- gsub("#\\s*\\d+\\s*", "", cleaned)
+  trimws(cleaned)
+}
+
+# Build a grouping key of "first initial + last name" so that
+# "Julian Sayin" and "Shotgun #10 J.Sayin" both become "j_sayin"
+normalize_player_name <- function(name) {
+  cleaned <- clean_display_name(name)
+  # Drop generational suffixes so "Penix Jr." matches "Penix"
+  cleaned <- gsub("\\s+(Jr\\.?|Sr\\.?|II|III|IV|V)$", "", cleaned, ignore.case = TRUE)
+  if (cleaned == "") return(tolower(name))
+  first_initial <- tolower(substr(cleaned, 1, 1))
+  # Last name = everything after the final space or period
+  # ("Julian Sayin" and "J.Sayin" both -> "sayin")
+  last_name <- tolower(sub(".*[ .]", "", cleaned))
+  paste(first_initial, last_name, sep = "_")
+}
+
+# Pick the best display name from duplicate variants: clean each one,
+# then prefer the longest (full "Julian Sayin" over abbreviated "J.Sayin")
 get_canonical_name <- function(names) {
-  # Prefer the longest name (likely the full name like "Julian Sayin" over "J.Sayin")
-  names[which.max(nchar(names))]
+  cleaned <- vapply(names, clean_display_name, character(1), USE.NAMES = FALSE)
+  cleaned[which.max(nchar(cleaned))]
 }
 
 # Function to fetch and process QB stats
@@ -104,14 +129,15 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
 # Function to aggregate stats across multiple weeks
 aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
   qb_data |>
-    # Add normalized name for grouping (extracts last name)
+    # Add normalized name key for grouping (first initial + last name)
     mutate(
-      name_normalized = sapply(player, normalize_player_name)
+      name_key = vapply(player, normalize_player_name, character(1), USE.NAMES = FALSE)
     ) |>
     # Group by normalized name + team + conference to combine duplicates
-    group_by(name_normalized, team, conference) |>
+    # like "Julian Sayin" and "Shotgun #10 J.Sayin"
+    group_by(name_key, team, conference) |>
     summarize(
-      # Pick the best (longest) original name as display name
+      # Pick the cleaned full-name variant as the display name
       player = get_canonical_name(unique(player)),
       games = n_distinct(week),
       attempts = sum(attempts),
@@ -122,7 +148,6 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       total_epa = sum(total_epa),
       .groups = "drop"
     ) |>
-    select(-name_normalized) |>
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
       yards_per_att = round(passing_yards / attempts, 1),
@@ -130,7 +155,9 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       epa_per_game = round(total_epa / games, 1)
     ) |>
     filter(attempts >= min_attempts) |>
-    left_join(TEAM_LOGOS, by = "team") |>
+    # Join logos on a normalized team key so accents/punctuation don't break matches
+    mutate(team_key = normalize_team_name(team)) |>
+    left_join(TEAM_LOGOS, by = "team_key") |>
     select(
       logo, player, team, conference, games,
       completions, attempts, comp_pct,
