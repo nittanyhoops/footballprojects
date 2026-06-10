@@ -9,6 +9,7 @@ library(reactable)
 library(reactablefmtr)
 library(bslib)
 library(shinycssloaders)
+library(htmltools)
 
 # Power 4 conferences (Big Ten, SEC, Big 12, ACC)
 POWER_4_CONFERENCES <- c("Big Ten", "SEC", "Big 12", "ACC")
@@ -23,6 +24,15 @@ FBS_CONFERENCES <- c(
 
 # Current season (update as needed)
 CURRENT_SEASON <- 2025
+
+# Team logos from ESPN (no API key required); falls back to empty if unavailable
+TEAM_LOGOS <- tryCatch({
+  cfbfastR::espn_cfb_teams() |>
+    dplyr::select(team, logo) |>
+    dplyr::distinct(team, .keep_all = TRUE)
+}, error = function(e) {
+  data.frame(team = character(), logo = character(), stringsAsFactors = FALSE)
+})
 
 # Function to fetch and process QB stats
 fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
@@ -89,11 +99,37 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       epa_per_game = round(total_epa / games, 1)
     ) |>
     filter(attempts >= min_attempts) |>
+    left_join(TEAM_LOGOS, by = "team") |>
+    select(
+      logo, player, team, conference, games,
+      completions, attempts, comp_pct,
+      passing_yards, yards_per_att, touchdowns, interceptions,
+      total_epa, epa_per_play, epa_per_game
+    ) |>
     arrange(desc(epa_per_game))
 }
 
 # Create styled reactable for QB stats
 create_qb_table <- function(data) {
+
+  # Diverging color scale for EPA/Game: low = light red, mid = white, high = light green
+  epa_game_range <- range(data$epa_per_game, na.rm = TRUE)
+  epa_game_ramp <- grDevices::colorRamp(c("#f8b4b4", "#ffffff", "#b7e4c7"))
+  epa_game_style <- function(value) {
+    if (is.na(value)) return(list())
+    norm <- if (diff(epa_game_range) == 0) {
+      0.5
+    } else {
+      (value - epa_game_range[1]) / diff(epa_game_range)
+    }
+    rgb_vals <- epa_game_ramp(norm)
+    list(
+      background = grDevices::rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], maxColorValue = 255),
+      color = "#1f2937",
+      fontWeight = "bold"
+    )
+  }
+
   reactable(
     data,
     searchable = TRUE,
@@ -119,32 +155,46 @@ create_qb_table <- function(data) {
       style = list(fontFamily = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")
     ),
     columns = list(
+      logo = colDef(
+        name = "",
+        minWidth = 50,
+        sticky = "left",
+        sortable = FALSE,
+        filterable = FALSE,
+        align = "center",
+        cell = function(value) {
+          if (is.na(value) || value == "") return("")
+          htmltools::img(src = value, height = "24px", alt = "")
+        }
+      ),
       player = colDef(
         name = "Player",
         minWidth = 150,
         sticky = "left",
-        style = list(fontWeight = "bold")
+        style = list(fontWeight = "bold", whiteSpace = "nowrap")
       ),
       team = colDef(
         name = "Team",
-        minWidth = 120
+        minWidth = 120,
+        style = list(whiteSpace = "nowrap")
       ),
       conference = colDef(
         name = "Conf",
-        minWidth = 100
+        minWidth = 100,
+        style = list(whiteSpace = "nowrap")
       ),
       games = colDef(
         name = "G",
         minWidth = 50,
         align = "center"
       ),
-      attempts = colDef(
-        name = "ATT",
+      completions = colDef(
+        name = "CMP",
         minWidth = 60,
         align = "center"
       ),
-      completions = colDef(
-        name = "CMP",
+      attempts = colDef(
+        name = "ATT",
         minWidth = 60,
         align = "center"
       ),
@@ -200,10 +250,7 @@ create_qb_table <- function(data) {
         name = "EPA/Game",
         minWidth = 95,
         align = "center",
-        style = function(value) {
-          color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
-          list(color = color, fontWeight = "bold")
-        }
+        style = epa_game_style
       )
     )
   )

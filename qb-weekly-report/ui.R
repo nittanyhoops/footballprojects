@@ -105,37 +105,18 @@ ui <- page_sidebar(
       )
     ),
     card_body(
-      # Summary stats
-      layout_columns(
-        col_widths = c(3, 3, 3, 3),
-        value_box(
-          title = "Total QBs",
-          value = textOutput("total_qbs"),
-          showcase = icon("users"),
-          theme = value_box_theme(bg = "#001E44", fg = "#ffffff")
-        ),
-        value_box(
-          title = "Avg EPA/Play",
-          value = textOutput("avg_epa"),
-          showcase = icon("chart-line"),
-          theme = value_box_theme(bg = "#374151", fg = "#ffffff")
-        ),
-        value_box(
-          title = "Total TDs",
-          value = textOutput("total_tds"),
-          showcase = icon("football"),
-          theme = value_box_theme(bg = "#6b7280", fg = "#ffffff")
-        ),
-        value_box(
-          title = "Conferences",
-          value = textOutput("num_conferences"),
-          showcase = icon("building-columns"),
-          theme = value_box_theme(bg = "#9ca3af", fg = "#1f2937")
+      # Callout note: total QBs matching current filters
+      div(
+        class = "alert d-flex align-items-center gap-2",
+        style = "background-color: #f3f4f6; border-left: 4px solid #001E44; color: #1f2937;",
+        icon("users"),
+        span(
+          strong(textOutput("total_qbs", inline = TRUE)),
+          " quarterbacks match the current filters"
         )
       ),
 
       # Main data table
-      hr(),
       shinycssloaders::withSpinner(
         reactableOutput("qb_table"),
         type = 6,
@@ -148,7 +129,8 @@ ui <- page_sidebar(
         class = "text-center text-muted small mt-3",
         p(
           "Data sourced from ",
-          tags$a(href = "https://cfbfastR.sportsdataverse.org/", target = "_blank", "cfbfastR")
+          tags$a(href = "https://cfbfastR.sportsdataverse.org/", target = "_blank", "cfbfastR"),
+          " - Data not available for all games."
         ),
         p("Dashboard by @NittanyHoops")
       )

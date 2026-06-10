@@ -71,25 +71,10 @@ server <- function(input, output, session) {
     paste0(" | ", input$season, " Season | ", conf_text, " | Min ", input$min_attempts, " attempts")
   })
 
-  # Render summary stats
+  # Render total QB count for callout note
   output$total_qbs <- renderText({
     req(filtered_data())
     nrow(filtered_data())
-  })
-
-  output$avg_epa <- renderText({
-    req(filtered_data())
-    round(mean(filtered_data()$epa_per_play, na.rm = TRUE), 3)
-  })
-
-  output$total_tds <- renderText({
-    req(filtered_data())
-    sum(filtered_data()$touchdowns, na.rm = TRUE)
-  })
-
-  output$num_conferences <- renderText({
-    req(filtered_data())
-    n_distinct(filtered_data()$conference)
   })
 
   # Render main data table
@@ -104,7 +89,7 @@ server <- function(input, output, session) {
       paste0("qb_stats_", input$season, "_", Sys.Date(), ".csv")
     },
     content = function(file) {
-      write.csv(filtered_data(), file, row.names = FALSE)
+      write.csv(select(filtered_data(), -logo), file, row.names = FALSE)
     }
   )
 
@@ -113,11 +98,12 @@ server <- function(input, output, session) {
       paste0("qb_stats_", input$season, "_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
+      export_data <- select(filtered_data(), -logo)
       if (requireNamespace("writexl", quietly = TRUE)) {
-        writexl::write_xlsx(filtered_data(), file)
+        writexl::write_xlsx(export_data, file)
       } else {
         # Fallback to CSV if writexl not available
-        write.csv(filtered_data(), file, row.names = FALSE)
+        write.csv(export_data, file, row.names = FALSE)
         showNotification("writexl package not installed. Downloaded as CSV instead.", type = "warning")
       }
     }
