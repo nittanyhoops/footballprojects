@@ -119,9 +119,11 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
       week
     ) |>
     summarize(
-      attempts = n(),
+      # A sack is a pass play but not a passing attempt
+      plays = n(),
+      attempts = sum(sack != 1, na.rm = TRUE),
       completions = sum(completion, na.rm = TRUE),
-      passing_yards = sum(yards_gained, na.rm = TRUE),
+      passing_yards = sum(yards_gained[sack != 1], na.rm = TRUE),
       touchdowns = sum(pass_td, na.rm = TRUE),
       interceptions = sum(int, na.rm = TRUE),
       total_epa = sum(EPA, na.rm = TRUE),
@@ -130,7 +132,7 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
       yards_per_att = round(passing_yards / attempts, 1),
-      epa_per_play = round(total_epa / attempts, 3)
+      epa_per_play = round(total_epa / plays, 3)
     ) |>
     arrange(desc(epa_per_play))
 
@@ -151,6 +153,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       # Pick the cleaned full-name variant as the display name
       player = get_canonical_name(unique(player)),
       games = n_distinct(week),
+      plays = sum(plays),
       attempts = sum(attempts),
       completions = sum(completions),
       passing_yards = sum(passing_yards),
@@ -162,7 +165,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
       yards_per_att = round(passing_yards / attempts, 1),
-      epa_per_play = round(total_epa / attempts, 3)
+      epa_per_play = round(total_epa / plays, 3)
     ) |>
     filter(attempts >= min_attempts) |>
     # Join logos on a normalized team key so accents/punctuation don't break matches
@@ -172,7 +175,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       logo, player, team, conference, games,
       completions, attempts, comp_pct,
       passing_yards, yards_per_att, touchdowns, interceptions,
-      total_epa, epa_per_play
+      plays, total_epa, epa_per_play
     ) |>
     arrange(desc(epa_per_play))
 }
@@ -294,6 +297,11 @@ create_qb_table <- function(data) {
         minWidth = 50,
         align = "center",
         style = list(color = "#6b7280")
+      ),
+      plays = colDef(
+        name = "Plays",
+        minWidth = 65,
+        align = "center"
       ),
       total_epa = colDef(
         name = "Total EPA",
