@@ -1,4 +1,4 @@
-# College QB Weekly Stats Report
+# College QB Stats Report
 
 An interactive Shiny dashboard for analyzing college football quarterback performance using EPA (Expected Points Added) and traditional stats.
 
