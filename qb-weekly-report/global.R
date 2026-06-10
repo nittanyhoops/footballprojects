@@ -50,32 +50,36 @@ TEAM_LOGOS <- tryCatch({
   data.frame(team_key = character(), logo = character(), stringsAsFactors = FALSE)
 })
 
-# Strip play-formation prefixes and jersey numbers from a player name
-# ("Shotgun #10 J.Sayin" -> "J.Sayin")
+# Strip play-formation prefixes and jersey numbers from a player name.
+# Real PBP values look like "#10 J.Sayin", ") No Huddle-Shotgun #2 D.Pavia",
+# "04:21) No Huddle #15 T.Simpson", or a clean "Julian Sayin".
 clean_display_name <- function(name) {
-  # Comprehensive list of formation/play prefixes found in PBP data
-  formations <- paste0(
-    "^(Shotgun|Pistol|Under Center|Wildcat|I-Form|I Form|Singleback|Single Back|",
-    "Jumbo|Goal Line|Empty|No Huddle Shotgun|No Huddle|Ace|Spread|Pro|Victory|",
-    "Kneel|Punt|Field Goal|Extra Point|Kickoff|Onside Kick)\\s*"
-  )
-  cleaned <- gsub(formations, "", name, ignore.case = TRUE)
-  # Remove jersey number patterns: "#10", "# 10", leading "10 -", etc.
-  cleaned <- gsub("#\\s*\\d+\\s*", "", cleaned)
-  cleaned <- gsub("^\\d+\\s*-?\\s*", "", cleaned)
+  cleaned <- name
+  if (grepl("#\\s*\\d+", cleaned)) {
+    # Player name is whatever follows the last jersey-number marker
+    cleaned <- sub(".*#\\s*\\d+\\s*", "", cleaned)
+  } else {
+    # No jersey number: strip leading non-letter junk (") ", ", ", timestamps)
+    cleaned <- sub("^[^A-Za-z]+", "", cleaned)
+    # Then strip formation prefixes (hyphen- or space-separated)
+    cleaned <- sub(
+      "^(No Huddle[- ]Shotgun|No Huddle|Shotgun|Pistol|Under Center|Wildcat|I-Form|I Form|Singleback|Single Back|Jumbo|Goal Line|Empty|Ace|Spread)[- ]*",
+      "", cleaned, ignore.case = TRUE
+    )
+  }
   trimws(cleaned)
 }
 
 # Build a grouping key of "first initial + last name" so that
-# "Julian Sayin" and "Shotgun #10 J.Sayin" both become "j_sayin"
+# "Julian Sayin", "#10 J.Sayin", and "Shotgun #10 J.Sayin" all become "j_sayin"
 normalize_player_name <- function(name) {
   cleaned <- clean_display_name(name)
-  # Drop generational suffixes so "Penix Jr." matches "Penix"
-  cleaned <- gsub("\\s+(Jr\\.?|Sr\\.?|II|III|IV|V)$", "", cleaned, ignore.case = TRUE)
+  # Drop generational suffixes so "R.Moore III" matches "Raymond Moore III"
+  cleaned <- gsub("\\s+(Jr\\.?|Sr\\.?|II|III|IV|V)\\.?$", "", cleaned, ignore.case = TRUE)
   if (cleaned == "") return(tolower(name))
   first_initial <- tolower(substr(cleaned, 1, 1))
   # Last name = everything after the final space or period
-  # ("Julian Sayin" and "J.Sayin" both -> "sayin")
+  # ("Julian Sayin", "J.Sayin", and "D. Pavia" all reduce to their last name)
   last_name <- tolower(sub(".*[ .]", "", cleaned))
   paste(first_initial, last_name, sep = "_")
 }
