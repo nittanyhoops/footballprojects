@@ -121,6 +121,7 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
     summarize(
       # A sack is a pass play but not a passing attempt
       plays = n(),
+      successful_plays = sum(EPA > 0, na.rm = TRUE),
       attempts = sum(sack != 1, na.rm = TRUE),
       completions = sum(completion, na.rm = TRUE),
       passing_yards = sum(yards_gained[sack != 1], na.rm = TRUE),
@@ -131,7 +132,7 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
     ) |>
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
-      yards_per_att = round(passing_yards / attempts, 1),
+      success_rate = round(successful_plays / plays * 100, 1),
       epa_per_play = round(total_epa / plays, 3)
     ) |>
     arrange(desc(epa_per_play))
@@ -154,6 +155,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       player = get_canonical_name(unique(player)),
       games = n_distinct(week),
       plays = sum(plays),
+      successful_plays = sum(successful_plays),
       attempts = sum(attempts),
       completions = sum(completions),
       passing_yards = sum(passing_yards),
@@ -164,7 +166,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
     ) |>
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
-      yards_per_att = round(passing_yards / attempts, 1),
+      success_rate = round(successful_plays / plays * 100, 1),
       epa_per_play = round(total_epa / plays, 3)
     ) |>
     filter(attempts >= min_attempts) |>
@@ -174,8 +176,8 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
     select(
       logo, player, team, conference, games,
       completions, attempts, comp_pct,
-      passing_yards, yards_per_att, touchdowns, interceptions,
-      plays, total_epa, epa_per_play
+      passing_yards, touchdowns, interceptions,
+      plays, success_rate, total_epa, epa_per_play
     ) |>
     arrange(desc(epa_per_play))
 }
@@ -281,11 +283,6 @@ create_qb_table <- function(data) {
         align = "center",
         format = colFormat(separators = TRUE)
       ),
-      yards_per_att = colDef(
-        name = "Y/A",
-        minWidth = 60,
-        align = "center"
-      ),
       touchdowns = colDef(
         name = "TD",
         minWidth = 50,
@@ -302,6 +299,12 @@ create_qb_table <- function(data) {
         name = "Plays",
         minWidth = 65,
         align = "center"
+      ),
+      success_rate = colDef(
+        name = "Success%",
+        minWidth = 80,
+        align = "center",
+        format = colFormat(suffix = "%")
       ),
       total_epa = colDef(
         name = "Total EPA",
