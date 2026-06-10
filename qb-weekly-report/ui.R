@@ -1,15 +1,13 @@
 # ui.R - User Interface for QB Weekly Stats Report
 
 ui <- page_sidebar(
-  title = "College QB Weekly Stats Report",
   theme = bs_theme(
     version = 5,
     bootswatch = "flatly",
     primary = "#001E44",
     secondary = "#6c757d",
     success = "#5a6d7a",
-    info = "#8a9aa5",
-    "navbar-bg" = "#001E44"
+    info = "#8a9aa5"
   ),
 
   # Sidebar with filters
@@ -51,23 +49,23 @@ ui <- page_sidebar(
 
     hr(),
 
-    # Minimum attempts filter
-    sliderInput(
+    # Minimum attempts filter (type or use arrows)
+    numericInput(
       inputId = "min_attempts",
       label = "Minimum Attempts",
-      min = 1,
-      max = 200,
       value = 50,
+      min = 1,
+      max = 500,
       step = 5
     ),
 
-    # Minimum games filter
-    sliderInput(
+    # Minimum games filter (type or use arrows)
+    numericInput(
       inputId = "min_games",
       label = "Minimum Games",
+      value = 1,
       min = 1,
       max = 15,
-      value = 1,
       step = 1
     ),
 
@@ -96,7 +94,7 @@ ui <- page_sidebar(
     card_header(
       class = "d-flex justify-content-between align-items-center",
       div(
-        h4("Quarterback Rankings", class = "mb-0"),
+        h4("College QB Report", class = "mb-0"),
         textOutput("subtitle", inline = TRUE)
       ),
       div(

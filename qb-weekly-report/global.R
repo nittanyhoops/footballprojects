@@ -27,12 +27,35 @@ CURRENT_SEASON <- 2025
 
 # Team logos from ESPN (no API key required); falls back to empty if unavailable
 TEAM_LOGOS <- tryCatch({
-  cfbfastR::espn_cfb_teams() |>
-    dplyr::select(team, logo) |>
+  cfbfastR::cfbd_team_info() |>
+    dplyr::select(team = school, logo = logo_primary) |>
     dplyr::distinct(team, .keep_all = TRUE)
 }, error = function(e) {
   data.frame(team = character(), logo = character(), stringsAsFactors = FALSE)
 })
+
+# Function to normalize player names (handles "Shotgun #10 J.Sayin" -> last name)
+normalize_player_name <- function(name) {
+  # Remove formation/position prefixes like "Shotgun", "Pistol", "Under Center", etc.
+  cleaned <- gsub("^(Shotgun|Pistol|Under Center|Wildcat|I-Form|Singleback|Jumbo|Goal Line|Empty)\\s*", "", name, ignore.case = TRUE)
+  # Remove jersey numbers like "#10" or "# 10"
+
+  cleaned <- gsub("#\\s*\\d+\\s*", "", cleaned)
+  # Trim whitespace
+  cleaned <- trimws(cleaned)
+  # Extract last name (last word, or after abbreviated first initial like "J.")
+  # If name is like "J.Sayin" or "J. Sayin", extract "Sayin"
+  if (grepl("^[A-Z]\\.", cleaned)) {
+    cleaned <- gsub("^[A-Z]\\.\\s*", "", cleaned)
+  }
+  return(cleaned)
+}
+
+# Function to get canonical player name from a group of similar names
+get_canonical_name <- function(names) {
+  # Prefer the longest name (likely the full name like "Julian Sayin" over "J.Sayin")
+  names[which.max(nchar(names))]
+}
 
 # Function to fetch and process QB stats
 fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
@@ -81,8 +104,15 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
 # Function to aggregate stats across multiple weeks
 aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
   qb_data |>
-    group_by(player, team, conference) |>
+    # Add normalized name for grouping (extracts last name)
+    mutate(
+      name_normalized = sapply(player, normalize_player_name)
+    ) |>
+    # Group by normalized name + team + conference to combine duplicates
+    group_by(name_normalized, team, conference) |>
     summarize(
+      # Pick the best (longest) original name as display name
+      player = get_canonical_name(unique(player)),
       games = n_distinct(week),
       attempts = sum(attempts),
       completions = sum(completions),
@@ -92,6 +122,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       total_epa = sum(total_epa),
       .groups = "drop"
     ) |>
+    select(-name_normalized) |>
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
       yards_per_att = round(passing_yards / attempts, 1),
