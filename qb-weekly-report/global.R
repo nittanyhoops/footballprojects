@@ -103,13 +103,15 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
       filter(week == !!week)
   }
 
-  # Filter to passing plays and calculate QB stats
+  # Filter to passing plays and deduplicate by play ID
+  # (raw data sometimes has duplicate rows for the same play)
   qb_stats <- pbp_data |>
     filter(
       pass == 1,
       !is.na(passer_player_name),
       passer_player_name != ""
     ) |>
+    distinct(id_play, .keep_all = TRUE) |>
     group_by(
       player = passer_player_name,
       team = pos_team,
