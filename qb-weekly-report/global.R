@@ -53,11 +53,16 @@ TEAM_LOGOS <- tryCatch({
 # Strip play-formation prefixes and jersey numbers from a player name
 # ("Shotgun #10 J.Sayin" -> "J.Sayin")
 clean_display_name <- function(name) {
-  cleaned <- gsub(
-    "^(Shotgun|Pistol|Under Center|Wildcat|I-Form|Singleback|Jumbo|Goal Line|Empty|No Huddle( Shotgun)?)\\s*",
-    "", name, ignore.case = TRUE
+  # Comprehensive list of formation/play prefixes found in PBP data
+  formations <- paste0(
+    "^(Shotgun|Pistol|Under Center|Wildcat|I-Form|I Form|Singleback|Single Back|",
+    "Jumbo|Goal Line|Empty|No Huddle Shotgun|No Huddle|Ace|Spread|Pro|Victory|",
+    "Kneel|Punt|Field Goal|Extra Point|Kickoff|Onside Kick)\\s*"
   )
+  cleaned <- gsub(formations, "", name, ignore.case = TRUE)
+  # Remove jersey number patterns: "#10", "# 10", leading "10 -", etc.
   cleaned <- gsub("#\\s*\\d+\\s*", "", cleaned)
+  cleaned <- gsub("^\\d+\\s*-?\\s*", "", cleaned)
   trimws(cleaned)
 }
 
@@ -151,8 +156,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
     mutate(
       comp_pct = round(completions / attempts * 100, 1),
       yards_per_att = round(passing_yards / attempts, 1),
-      epa_per_play = round(total_epa / attempts, 3),
-      epa_per_game = round(total_epa / games, 1)
+      epa_per_play = round(total_epa / attempts, 3)
     ) |>
     filter(attempts >= min_attempts) |>
     # Join logos on a normalized team key so accents/punctuation don't break matches
@@ -162,25 +166,25 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       logo, player, team, conference, games,
       completions, attempts, comp_pct,
       passing_yards, yards_per_att, touchdowns, interceptions,
-      total_epa, epa_per_play, epa_per_game
+      total_epa, epa_per_play
     ) |>
-    arrange(desc(epa_per_game))
+    arrange(desc(epa_per_play))
 }
 
 # Create styled reactable for QB stats
 create_qb_table <- function(data) {
 
-  # Diverging color scale for EPA/Game: low = light red, mid = white, high = light green
-  epa_game_range <- range(data$epa_per_game, na.rm = TRUE)
-  epa_game_ramp <- grDevices::colorRamp(c("#f8b4b4", "#ffffff", "#b7e4c7"))
-  epa_game_style <- function(value) {
+  # Diverging color scale for EPA/Play: low = light red, mid = white, high = light green
+  epa_play_range <- range(data$epa_per_play, na.rm = TRUE)
+  epa_play_ramp <- grDevices::colorRamp(c("#f8b4b4", "#ffffff", "#b7e4c7"))
+  epa_play_style <- function(value) {
     if (is.na(value)) return(list())
-    norm <- if (diff(epa_game_range) == 0) {
+    norm <- if (diff(epa_play_range) == 0) {
       0.5
     } else {
-      (value - epa_game_range[1]) / diff(epa_game_range)
+      (value - epa_play_range[1]) / diff(epa_play_range)
     }
-    rgb_vals <- epa_game_ramp(norm)
+    rgb_vals <- epa_play_ramp(norm)
     list(
       background = grDevices::rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], maxColorValue = 255),
       color = "#1f2937",
@@ -199,7 +203,7 @@ create_qb_table <- function(data) {
     defaultPageSize = 25,
     showPageSizeOptions = TRUE,
     pageSizeOptions = c(10, 25, 50, 100),
-    defaultSorted = list(epa_per_game = "desc"),
+    defaultSorted = list(epa_per_play = "desc"),
     theme = reactableTheme(
       borderColor = "#d1d5db",
       stripedColor = "#f3f4f6",
@@ -299,16 +303,7 @@ create_qb_table <- function(data) {
         name = "EPA/Play",
         minWidth = 90,
         align = "center",
-        style = function(value) {
-          color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
-          list(color = color, fontWeight = "bold")
-        }
-      ),
-      epa_per_game = colDef(
-        name = "EPA/Game",
-        minWidth = 95,
-        align = "center",
-        style = epa_game_style
+        style = epa_play_style
       )
     )
   )

@@ -85,7 +85,7 @@ ui <- page_sidebar(
     div(
       class = "text-muted small",
       p("EPA = Expected Points Added"),
-      p("Sorted by EPA/Game by default")
+      p("Sorted by EPA/Play by default")
     )
   ),
 
