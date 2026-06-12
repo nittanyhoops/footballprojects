@@ -145,6 +145,17 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
       filter(week == !!week)
   }
 
+  # Immediately drop unused columns to stay under the 1GB shinyapps.io limit.
+  # The raw data has 330+ columns; we only need ~15 for QB stats.
+  pbp_data <- pbp_data |>
+    select(
+      id_play, game_id, week, season_type,
+      pos_team, offense_conference,
+      pass, rush, sack, completion, int, pass_td, rush_td,
+      yards_gained, EPA,
+      passer_player_name, rusher_player_name, play_text
+    )
+
   # Deduplicate all plays by play ID
   pbp_data <- pbp_data |> distinct(id_play, .keep_all = TRUE)
 
