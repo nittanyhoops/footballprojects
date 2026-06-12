@@ -128,7 +128,20 @@ ui <- page_sidebar(
       # Footer
       hr(),
       div(
-        class = "text-center text-muted small mt-3",
+        class = "text-muted small mt-3",
+        p(class = "fw-bold mb-1", "Column definitions"),
+        tags$ul(
+          class = "list-unstyled mb-3",
+          tags$li(strong("All Plays:"), " pass plays (including sacks) plus the QB's rushing attempts (kneel-downs excluded)."),
+          tags$li(strong("Success%:"), " percentage of the QB's plays with positive EPA (Expected Points Added)."),
+          tags$li(strong("Pass EPA:"), " total EPA on pass plays, including sacks."),
+          tags$li(strong("Rush EPA:"), " total EPA on the QB's rushing attempts."),
+          tags$li(strong("Total EPA:"), " Pass EPA plus Rush EPA."),
+          tags$li(strong("EPA/All Plays:"), " Total EPA divided by All Plays - the key per-play efficiency metric.")
+        )
+      ),
+      div(
+        class = "text-center text-muted small",
         p(
           "Data sourced from ",
           tags$a(href = "https://cfbfastR.sportsdataverse.org/", target = "_blank", "cfbfastR"),
