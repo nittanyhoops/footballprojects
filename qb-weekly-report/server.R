@@ -37,10 +37,15 @@ server <- function(input, output, session) {
 
     data <- raw_data()
 
-    # Filter by week if specific weeks selected
+    # Filter by week if specific weeks selected. Postseason games are all
+    # coded as week 1 in the data, so they get their own filter value.
     if (!is.null(input$week_filter) && !"all" %in% input$week_filter) {
-      selected_weeks <- as.numeric(input$week_filter)
-      data <- data |> filter(week %in% selected_weeks)
+      keep_postseason <- "post" %in% input$week_filter
+      selected_weeks <- suppressWarnings(as.numeric(setdiff(input$week_filter, "post")))
+      data <- data |> filter(
+        (season_type == "regular" & week %in% selected_weeks) |
+          (keep_postseason & season_type == "postseason")
+      )
     }
 
     # Filter by conference

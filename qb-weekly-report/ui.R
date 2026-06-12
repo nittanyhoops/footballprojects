@@ -27,7 +27,11 @@ ui <- page_sidebar(
     selectInput(
       inputId = "week_filter",
       label = "Week(s)",
-      choices = c("All Weeks" = "all", setNames(1:15, paste("Week", 1:15))),
+      choices = c(
+        "All Weeks" = "all",
+        setNames(1:15, paste("Week", 1:15)),
+        "Postseason" = "post"
+      ),
       selected = "all",
       multiple = TRUE
     ),

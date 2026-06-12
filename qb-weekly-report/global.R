@@ -105,7 +105,9 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
   # Deduplicate all plays by play ID
   pbp_data <- pbp_data |> distinct(id_play, .keep_all = TRUE)
 
-  # --- PASSING STATS ---
+  # --- PASSING STATS (per game) ---
+  # Note: postseason games are all coded as week 1 with season_type =
+  # "postseason", so stats are grouped per game_id, not per week
   pass_stats <- pbp_data |>
     filter(
       pass == 1,
@@ -116,7 +118,9 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
       player = passer_player_name,
       team = pos_team,
       conference = offense_conference,
-      week
+      season_type,
+      week,
+      game_id
     ) |>
     summarize(
       pass_plays = n(),
@@ -151,24 +155,23 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
 
   rush_stats <- rush_data |>
     group_by(
-      player,
+      name_key,
       team = pos_team,
-      conference = offense_conference,
-      week
+      game_id
     ) |>
     summarize(
       rush_plays = n(),
       successful_rush_plays = sum(EPA > 0, na.rm = TRUE),
       rush_epa = sum(EPA, na.rm = TRUE),
       .groups = "drop"
-    ) |>
-    mutate(name_key = vapply(player, normalize_player_name, character(1), USE.NAMES = FALSE))
+    )
 
-  # --- COMBINE PASSING AND RUSHING ---
+  # --- COMBINE PASSING AND RUSHING (per game, so postseason games
+  # don't collide with regular-season games sharing a week number) ---
   qb_stats <- pass_stats |>
     left_join(
-      rush_stats |> select(name_key, team, week, rush_plays, successful_rush_plays, rush_epa),
-      by = c("name_key", "team", "week")
+      rush_stats,
+      by = c("name_key", "team", "game_id")
     ) |>
     mutate(
       rush_plays = coalesce(rush_plays, 0L),
@@ -202,7 +205,9 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
     summarize(
       # Pick the cleaned full-name variant as the display name
       player = get_canonical_name(unique(player)),
-      games = n_distinct(week),
+      # Count actual games: all postseason games share week = 1, so
+      # counting weeks would undercount QBs with playoff appearances
+      games = n_distinct(game_id),
       pass_plays = sum(pass_plays),
       rush_plays = sum(rush_plays),
       successful_plays = sum(successful_plays),
