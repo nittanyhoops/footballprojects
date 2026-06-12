@@ -85,7 +85,12 @@ Run directly from RStudio or R console.
 ### shinyapps.io
 1. Create account at [shinyapps.io](https://www.shinyapps.io/)
 2. Install rsconnect: `install.packages("rsconnect")`
-3. Deploy: `rsconnect::deployApp("qb-weekly-report")`
+3. Precompute the stat files (required - raw play-by-play data exceeds the
+   1GB free-tier memory limit): `setwd("qb-weekly-report"); source("data-prep.R")`
+4. Deploy: `rsconnect::deployApp()`
+
+Rerun `data-prep.R` and redeploy whenever new games are played or the stat
+logic in `global.R` changes.
 
 ### Shiny Server
 Deploy on your own Shiny Server instance.
