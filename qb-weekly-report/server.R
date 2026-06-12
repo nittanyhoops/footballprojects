@@ -26,18 +26,6 @@ server <- function(input, output, session) {
     c(input$conference_p4, input$conference_g5)
   })
 
-  # Quick select Power 4 conferences
-  observeEvent(input$select_power4, {
-    updateCheckboxGroupInput(session, "conference_p4", selected = POWER_4_CONFERENCES)
-    updateCheckboxGroupInput(session, "conference_g5", selected = character(0))
-  })
-
-  # Quick select all conferences
-  observeEvent(input$select_all_conf, {
-    updateCheckboxGroupInput(session, "conference_p4", selected = POWER_4_CONFERENCES)
-    updateCheckboxGroupInput(session, "conference_g5", selected = GROUP_5_CONFERENCES)
-  })
-
   # Filtered and aggregated data
   filtered_data <- reactive({
     req(raw_data())
@@ -63,9 +51,6 @@ server <- function(input, output, session) {
 
     # Aggregate across weeks
     aggregated <- aggregate_qb_stats(data, min_attempts = input$min_attempts)
-
-    # Filter by minimum games
-    aggregated <- aggregated |> filter(games >= input$min_games)
 
     return(aggregated)
   })

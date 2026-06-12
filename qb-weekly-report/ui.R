@@ -57,13 +57,6 @@ ui <- page_sidebar(
       )
     ),
 
-    # Quick select buttons for conferences
-    div(
-      class = "d-flex gap-2 mb-3",
-      actionButton("select_power4", "Power 4", class = "btn-sm btn-outline-primary"),
-      actionButton("select_all_conf", "All FBS", class = "btn-sm btn-outline-secondary")
-    ),
-
     hr(),
 
     # Minimum attempts filter (type or use arrows)
@@ -74,16 +67,6 @@ ui <- page_sidebar(
       min = 1,
       max = 500,
       step = 5
-    ),
-
-    # Minimum games filter (type or use arrows)
-    numericInput(
-      inputId = "min_games",
-      label = "Minimum Games",
-      value = 1,
-      min = 1,
-      max = 15,
-      step = 1
     ),
 
     hr(),
