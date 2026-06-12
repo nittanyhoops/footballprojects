@@ -91,27 +91,27 @@ get_canonical_name <- function(names) {
   cleaned[which.max(nchar(cleaned))]
 }
 
-# Function to fetch and process QB stats
+# Function to fetch and process QB stats (passing + rushing)
 fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
 
   # Fetch play-by-play data
   if (is.null(week)) {
-    # Get all weeks up to current
     pbp_data <- cfbfastR::load_cfb_pbp(seasons = season)
   } else {
     pbp_data <- cfbfastR::load_cfb_pbp(seasons = season) |>
       filter(week == !!week)
   }
 
-  # Filter to passing plays and deduplicate by play ID
-  # (raw data sometimes has duplicate rows for the same play)
-  qb_stats <- pbp_data |>
+  # Deduplicate all plays by play ID
+  pbp_data <- pbp_data |> distinct(id_play, .keep_all = TRUE)
+
+  # --- PASSING STATS ---
+  pass_stats <- pbp_data |>
     filter(
       pass == 1,
       !is.na(passer_player_name),
       passer_player_name != ""
     ) |>
-    distinct(id_play, .keep_all = TRUE) |>
     group_by(
       player = passer_player_name,
       team = pos_team,
@@ -119,22 +119,71 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
       week
     ) |>
     summarize(
-      # A sack is a pass play but not a passing attempt
-      plays = n(),
-      successful_plays = sum(EPA > 0, na.rm = TRUE),
+      pass_plays = n(),
+      successful_pass_plays = sum(EPA > 0, na.rm = TRUE),
       attempts = sum(sack != 1, na.rm = TRUE),
       completions = sum(completion, na.rm = TRUE),
       passing_yards = sum(yards_gained[sack != 1], na.rm = TRUE),
       touchdowns = sum(pass_td, na.rm = TRUE),
       interceptions = sum(int, na.rm = TRUE),
-      total_epa = sum(EPA, na.rm = TRUE),
+      pass_epa = sum(EPA, na.rm = TRUE),
       .groups = "drop"
+    )
+
+  # Build set of (name_key, team) for all passers to identify QBs
+  pass_stats <- pass_stats |>
+    mutate(name_key = vapply(player, normalize_player_name, character(1), USE.NAMES = FALSE))
+  qb_keys <- pass_stats |>
+    distinct(name_key, team)
+
+  # --- RUSHING STATS (only for players who are also passers = QBs) ---
+  rush_data <- pbp_data |>
+    filter(
+      rush == 1,
+      !is.na(rusher_player_name),
+      rusher_player_name != ""
     ) |>
     mutate(
-      comp_pct = round(completions / attempts * 100, 1),
-      success_rate = round(successful_plays / plays * 100, 1),
-      epa_per_play = round(total_epa / plays, 3)
+      player = rusher_player_name,
+      name_key = vapply(rusher_player_name, normalize_player_name, character(1), USE.NAMES = FALSE)
     ) |>
+    inner_join(qb_keys, by = c("name_key", "pos_team" = "team"))
+
+  rush_stats <- rush_data |>
+    group_by(
+      player,
+      team = pos_team,
+      conference = offense_conference,
+      week
+    ) |>
+    summarize(
+      rush_plays = n(),
+      successful_rush_plays = sum(EPA > 0, na.rm = TRUE),
+      rush_epa = sum(EPA, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    mutate(name_key = vapply(player, normalize_player_name, character(1), USE.NAMES = FALSE))
+
+  # --- COMBINE PASSING AND RUSHING ---
+  qb_stats <- pass_stats |>
+    left_join(
+      rush_stats |> select(name_key, team, week, rush_plays, successful_rush_plays, rush_epa),
+      by = c("name_key", "team", "week")
+    ) |>
+    mutate(
+      rush_plays = coalesce(rush_plays, 0L),
+      successful_rush_plays = coalesce(successful_rush_plays, 0L),
+      rush_epa = coalesce(rush_epa, 0)
+    ) |>
+    mutate(
+      all_plays = pass_plays + rush_plays,
+      successful_plays = successful_pass_plays + successful_rush_plays,
+      total_epa = pass_epa + rush_epa,
+      comp_pct = round(completions / attempts * 100, 1),
+      success_rate = round(successful_plays / all_plays * 100, 1),
+      epa_per_play = round(total_epa / all_plays, 3)
+    ) |>
+    select(-name_key) |>
     arrange(desc(epa_per_play))
 
   return(qb_stats)
@@ -154,20 +203,24 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       # Pick the cleaned full-name variant as the display name
       player = get_canonical_name(unique(player)),
       games = n_distinct(week),
-      plays = sum(plays),
+      pass_plays = sum(pass_plays),
+      rush_plays = sum(rush_plays),
       successful_plays = sum(successful_plays),
       attempts = sum(attempts),
       completions = sum(completions),
       passing_yards = sum(passing_yards),
       touchdowns = sum(touchdowns),
       interceptions = sum(interceptions),
-      total_epa = sum(total_epa),
+      pass_epa = sum(pass_epa),
+      rush_epa = sum(rush_epa),
       .groups = "drop"
     ) |>
     mutate(
+      all_plays = pass_plays + rush_plays,
+      total_epa = pass_epa + rush_epa,
       comp_pct = round(completions / attempts * 100, 1),
-      success_rate = round(successful_plays / plays * 100, 1),
-      epa_per_play = round(total_epa / plays, 3)
+      success_rate = round(successful_plays / all_plays * 100, 1),
+      epa_per_play = round(total_epa / all_plays, 3)
     ) |>
     filter(attempts >= min_attempts) |>
     # Join logos on a normalized team key so accents/punctuation don't break matches
@@ -177,7 +230,7 @@ aggregate_qb_stats <- function(qb_data, min_attempts = 1) {
       logo, player, team, conference, games,
       completions, attempts, comp_pct,
       passing_yards, touchdowns, interceptions,
-      plays, success_rate, total_epa, epa_per_play
+      all_plays, success_rate, pass_epa, rush_epa, total_epa, epa_per_play
     ) |>
     arrange(desc(epa_per_play))
 }
@@ -295,9 +348,9 @@ create_qb_table <- function(data) {
         align = "center",
         style = list(color = "#6b7280")
       ),
-      plays = colDef(
-        name = "Plays",
-        minWidth = 65,
+      all_plays = colDef(
+        name = "All Plays",
+        minWidth = 80,
         align = "center"
       ),
       success_rate = colDef(
@@ -305,6 +358,26 @@ create_qb_table <- function(data) {
         minWidth = 80,
         align = "center",
         format = colFormat(suffix = "%")
+      ),
+      pass_epa = colDef(
+        name = "Pass EPA",
+        minWidth = 85,
+        align = "center",
+        format = colFormat(digits = 1),
+        style = function(value) {
+          color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
+          list(color = color, fontWeight = "bold")
+        }
+      ),
+      rush_epa = colDef(
+        name = "Rush EPA",
+        minWidth = 85,
+        align = "center",
+        format = colFormat(digits = 1),
+        style = function(value) {
+          color <- if (value > 0) "#001E44" else if (value < 0) "#6b7280" else "#9ca3af"
+          list(color = color, fontWeight = "bold")
+        }
       ),
       total_epa = colDef(
         name = "Total EPA",
@@ -317,8 +390,8 @@ create_qb_table <- function(data) {
         }
       ),
       epa_per_play = colDef(
-        name = "EPA/Play",
-        minWidth = 90,
+        name = "EPA/All Plays",
+        minWidth = 105,
         align = "center",
         style = epa_play_style
       )
