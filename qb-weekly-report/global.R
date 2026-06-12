@@ -91,6 +91,46 @@ get_canonical_name <- function(names) {
   cleaned[which.max(nchar(cleaned))]
 }
 
+# Extract the text before the first keyword occurrence and clean it into a
+# player name. Returns NA where no plausible name can be recovered.
+extract_name_before <- function(play_text, keyword_pattern) {
+  out <- rep(NA_character_, length(play_text))
+  has_kw <- !is.na(play_text) & grepl(keyword_pattern, play_text)
+  if (!any(has_kw)) return(out)
+  prefix <- sub(paste0(keyword_pattern, ".*$"), "", play_text[has_kw])
+  cleaned <- vapply(prefix, clean_display_name, character(1), USE.NAMES = FALSE)
+  cleaned[!grepl("^[A-Z]", cleaned)] <- NA_character_
+  out[has_kw] <- cleaned
+  out
+}
+
+# cfbfastR fails to parse player names on many plays (in 2025, 37% of passing
+# TD plays have no passer_player_name), which silently drops those plays from
+# any stat grouped by player. The name is recoverable from the play text:
+# "(13:35) Shotgun #11 C.Beck pass complete ... TOUCHDOWN" -> "C.Beck"
+recover_passer_name <- function(play_text) {
+  recovered <- extract_name_before(play_text, "\\s+pass\\b")
+  missing <- is.na(recovered)
+  recovered[missing] <- extract_name_before(play_text[missing], "\\s+sacked\\b")
+  recovered
+}
+
+recover_rusher_name <- function(play_text) {
+  recovered <- extract_name_before(play_text, "\\s+(rush|run)\\b")
+  # Kneel-downs ("J. Sayin takes a knee") are excluded from rush stats
+  recovered[grepl("takes a knee|kneel", play_text, ignore.case = TRUE)] <- NA_character_
+  recovered
+}
+
+# TRUE for plays where a replay review nullified the touchdown. cfbfastR keeps
+# pass_td = 1 from the original call, but the final ruling is the portion of
+# the play text before "(Original Play: ...)".
+td_nullified_by_review <- function(play_text) {
+  reviewed <- !is.na(play_text) & grepl("(Original Play:", play_text, fixed = TRUE)
+  final_ruling <- sub("\\(Original Play:.*$", "", play_text)
+  reviewed & !grepl("TOUCHDOWN|for a TD|Yd pass", final_ruling, ignore.case = TRUE)
+}
+
 # Function to fetch and process QB stats (passing + rushing)
 fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
 
@@ -105,6 +145,20 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
   # Deduplicate all plays by play ID
   pbp_data <- pbp_data |> distinct(id_play, .keep_all = TRUE)
 
+  # Recover player names that cfbfastR failed to parse from the play text
+  # (touchdown, sack, and pick-six play texts are the most affected)
+  needs_passer <- pbp_data$pass == 1 &
+    (is.na(pbp_data$passer_player_name) | pbp_data$passer_player_name == "")
+  needs_passer[is.na(needs_passer)] <- FALSE
+  pbp_data$passer_player_name[needs_passer] <-
+    recover_passer_name(pbp_data$play_text[needs_passer])
+
+  needs_rusher <- pbp_data$rush == 1 &
+    (is.na(pbp_data$rusher_player_name) | pbp_data$rusher_player_name == "")
+  needs_rusher[is.na(needs_rusher)] <- FALSE
+  pbp_data$rusher_player_name[needs_rusher] <-
+    recover_rusher_name(pbp_data$play_text[needs_rusher])
+
   # --- PASSING STATS (per game) ---
   # Note: postseason games are all coded as week 1 with season_type =
   # "postseason", so stats are grouped per game_id, not per week
@@ -113,6 +167,13 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
       pass == 1,
       !is.na(passer_player_name),
       passer_player_name != ""
+    ) |>
+    mutate(
+      # pass_td stays 1 on TDs overturned by replay review and is also set on
+      # a handful of interception plays; both must be excluded
+      is_pass_td = pass_td == 1 &
+        coalesce(int, 0) != 1 &
+        !td_nullified_by_review(play_text)
     ) |>
     group_by(
       player = passer_player_name,
@@ -127,8 +188,10 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
       successful_pass_plays = sum(EPA > 0, na.rm = TRUE),
       attempts = sum(sack != 1, na.rm = TRUE),
       completions = sum(completion, na.rm = TRUE),
-      passing_yards = sum(yards_gained[sack != 1], na.rm = TRUE),
-      touchdowns = sum(pass_td, na.rm = TRUE),
+      # Completions only: on interceptions and fumbles, yards_gained holds
+      # the defender's return yardage, not passing yards
+      passing_yards = sum(yards_gained[completion == 1], na.rm = TRUE),
+      touchdowns = sum(is_pass_td, na.rm = TRUE),
       interceptions = sum(int, na.rm = TRUE),
       pass_epa = sum(EPA, na.rm = TRUE),
       .groups = "drop"
@@ -145,7 +208,9 @@ fetch_qb_stats <- function(season = CURRENT_SEASON, week = NULL) {
     filter(
       rush == 1,
       !is.na(rusher_player_name),
-      rusher_player_name != ""
+      rusher_player_name != "",
+      # Kneel-downs are clock kills, not rushing performance
+      !grepl("takes a knee|kneel", play_text, ignore.case = TRUE)
     ) |>
     mutate(
       player = rusher_player_name,

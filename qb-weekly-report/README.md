@@ -65,6 +65,18 @@ shiny::runApp()
 
 Data is sourced from [cfbfastR](https://cfbfastR.sportsdataverse.org/), which provides play-by-play data for college football including EPA calculations.
 
+### Data Quality Corrections
+
+The raw cfbfastR feed has several quirks this app corrects for:
+
+- **Missing player names**: cfbfastR fails to parse the passer/rusher name on many plays (~37% of passing TD plays). Names are recovered from the play text so those plays count toward the right QB.
+- **Overturned touchdowns**: `pass_td` stays set on TDs nullified by replay review; the final ruling is read from the play text.
+- **Interception return yards**: on turnovers, `yards_gained` holds the defender's return yardage, so passing yards are summed over completions only.
+- **Duplicate plays**: rows are deduplicated by play ID.
+- **Kneel-downs** are excluded from rushing/EPA stats.
+
+Some games are missing or only partially captured in the source feed (noted in the app footer), so volume stats can run slightly below official totals for affected teams.
+
 ## Deployment Options
 
 ### Local
