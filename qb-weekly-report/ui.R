@@ -36,12 +36,25 @@ ui <- page_sidebar(
       multiple = TRUE
     ),
 
-    # Conference filter
+    # Conference filter: Power 4 always visible, Group of 5 folded away
     checkboxGroupInput(
-      inputId = "conference_filter",
+      inputId = "conference_p4",
       label = "Conferences",
-      choices = FBS_CONFERENCES,
+      choices = POWER_4_CONFERENCES,
       selected = POWER_4_CONFERENCES
+    ),
+    accordion(
+      open = FALSE,
+      class = "mb-3",
+      accordion_panel(
+        "Group of 5 / Independents",
+        checkboxGroupInput(
+          inputId = "conference_g5",
+          label = NULL,
+          choices = GROUP_5_CONFERENCES,
+          selected = NULL
+        )
+      )
     ),
 
     # Quick select buttons for conferences
@@ -133,7 +146,7 @@ ui <- page_sidebar(
         tags$ul(
           class = "list-unstyled mb-3",
           tags$li(strong("All Plays:"), " pass plays (including sacks) plus the QB's rushing attempts (kneel-downs excluded)."),
-          tags$li(strong("Success%:"), " percentage of the QB's plays with positive EPA (Expected Points Added)."),
+          tags$li(strong("Success Rate:"), " percentage of the QB's plays with positive EPA (Expected Points Added)."),
           tags$li(strong("Pass EPA:"), " total EPA on pass plays, including sacks."),
           tags$li(strong("Rush EPA:"), " total EPA on the QB's rushing attempts."),
           tags$li(strong("Total EPA:"), " Pass EPA plus Rush EPA."),

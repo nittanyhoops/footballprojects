@@ -21,14 +21,21 @@ server <- function(input, output, session) {
     })
   }, ignoreNULL = FALSE)
 
+  # Conferences checked across both the Power 4 and Group of 5 inputs
+  selected_conferences <- reactive({
+    c(input$conference_p4, input$conference_g5)
+  })
+
   # Quick select Power 4 conferences
   observeEvent(input$select_power4, {
-    updateCheckboxGroupInput(session, "conference_filter", selected = POWER_4_CONFERENCES)
+    updateCheckboxGroupInput(session, "conference_p4", selected = POWER_4_CONFERENCES)
+    updateCheckboxGroupInput(session, "conference_g5", selected = character(0))
   })
 
   # Quick select all conferences
   observeEvent(input$select_all_conf, {
-    updateCheckboxGroupInput(session, "conference_filter", selected = FBS_CONFERENCES)
+    updateCheckboxGroupInput(session, "conference_p4", selected = POWER_4_CONFERENCES)
+    updateCheckboxGroupInput(session, "conference_g5", selected = GROUP_5_CONFERENCES)
   })
 
   # Filtered and aggregated data
@@ -48,9 +55,10 @@ server <- function(input, output, session) {
       )
     }
 
-    # Filter by conference
-    if (!is.null(input$conference_filter)) {
-      data <- data |> filter(conference %in% input$conference_filter)
+    # Filter by conference (no boxes checked = show all)
+    confs <- selected_conferences()
+    if (length(confs) > 0) {
+      data <- data |> filter(conference %in% confs)
     }
 
     # Aggregate across weeks
@@ -66,12 +74,13 @@ server <- function(input, output, session) {
   output$subtitle <- renderText({
     req(filtered_data())
     n_qbs <- nrow(filtered_data())
-    conf_text <- if (length(input$conference_filter) == length(FBS_CONFERENCES)) {
+    confs <- selected_conferences()
+    conf_text <- if (setequal(confs, FBS_CONFERENCES)) {
       "All FBS"
-    } else if (setequal(input$conference_filter, POWER_4_CONFERENCES)) {
+    } else if (setequal(confs, POWER_4_CONFERENCES)) {
       "Power 4"
     } else {
-      paste(length(input$conference_filter), "conferences")
+      paste(length(confs), "conferences")
     }
     paste0(" | ", input$season, " Season | ", conf_text, " | Min ", input$min_attempts, " attempts")
   })

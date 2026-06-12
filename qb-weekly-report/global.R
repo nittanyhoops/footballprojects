@@ -22,6 +22,9 @@ FBS_CONFERENCES <- c(
 "Mountain West", "Sun Belt", "FBS Independents"  # Group of 5
 )
 
+# Group of 5 + Independents (everything outside the Power 4)
+GROUP_5_CONFERENCES <- setdiff(FBS_CONFERENCES, POWER_4_CONFERENCES)
+
 # Current season (update as needed)
 CURRENT_SEASON <- 2025
 
@@ -326,6 +329,11 @@ create_qb_table <- function(data) {
     )
   }
 
+  # Placeholder column rendered as the row's position in the current sort
+  data <- data |>
+    mutate(rank = NA_integer_) |>
+    select(rank, everything())
+
   reactable(
     data,
     searchable = TRUE,
@@ -338,6 +346,18 @@ create_qb_table <- function(data) {
     showPageSizeOptions = TRUE,
     pageSizeOptions = c(10, 25, 50, 100),
     defaultSorted = list(epa_per_play = "desc"),
+    columnGroups = list(
+      colGroup(
+        name = "Passing",
+        columns = c("completions", "attempts", "comp_pct",
+                    "passing_yards", "touchdowns", "interceptions")
+      ),
+      colGroup(
+        name = "Advanced",
+        columns = c("all_plays", "success_rate", "pass_epa",
+                    "rush_epa", "total_epa", "epa_per_play")
+      )
+    ),
     theme = reactableTheme(
       borderColor = "#d1d5db",
       stripedColor = "#f3f4f6",
@@ -351,6 +371,18 @@ create_qb_table <- function(data) {
       style = list(fontFamily = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")
     ),
     columns = list(
+      rank = colDef(
+        name = "#",
+        minWidth = 45,
+        sticky = "left",
+        sortable = FALSE,
+        filterable = FALSE,
+        align = "center",
+        # Rank follows the current sort order across pages
+        cell = htmlwidgets::JS("function(cellInfo, state) {
+          return state.pageIndex * state.pageSize + cellInfo.viewIndex + 1
+        }")
+      ),
       logo = colDef(
         name = "",
         minWidth = 50,
@@ -424,8 +456,8 @@ create_qb_table <- function(data) {
         align = "center"
       ),
       success_rate = colDef(
-        name = "Success%",
-        minWidth = 80,
+        name = "Success Rate",
+        minWidth = 100,
         align = "center",
         format = colFormat(suffix = "%")
       ),
